@@ -1,0 +1,116 @@
+
+
+    Intrebare:
+   ------------
+
+     Cum se explica faptul ca la calculatoarele compatibile Spectrum culorile
+afisate sunt in ordinea urmatoare: Black, Blue, Red, Magenta, Green, Cyan,
+Yellow si White, in timp ce pe majoritatea sistemelor grafice de pe PC-uri
+ordinea primelor culori este: Black, Blue, Green, Cyan, Red, Magenta, Yellow,
+White ?
+
+
+    Recompensa:
+   ------------
+
+     Cine poate da un raspuns diferit de al meu (citeste mai departe) va
+primi gratuit un pachet din versiunea inregistrata a programelor: "Z80TOOLS"
+Trimiteti raspunsurile cu detalii suficiente pe adresa: vma@electra.upit.ro
+
+
+
+    Explicatia mea:
+   -----------------
+
+     Memoria video la calculatoarele compatibile Spectrum este de 6912 bytes.
+Aici se gaseste informatia ce este afisata continuu pe ecran intr-o rezolutie
+de 256x192 pixeli cu 15 culori simultan !
+     Memoria video este constituita din doua zone:
+         - zona cu imaginea bitmap in 2 culori (256*192/8=6144 bytes)
+         - zona de atribute (768 bytes)
+     Fiecare pixel de pe ecran ocua un byte in prima zona. Deci un byte de
+aici contine informatie de tip "stins", "aprins" pentru 8 pixeli.
+     Fiecare byte de atribut din zona a doua contine informatie de culoare
+pentru 64 de pixeli (64/8=8 bytes din prima zona) => 6144/8=768 bytes.
+
+
+     Un byte de atribut are urmatorul format:
+
+
+        b7  b6  b5 b4 b3  b2 b1 b0
+        \   \   \ддбддд/  \ддбддд/
+         Ё   Ё     Ё         Ё
+         Ё   Ё     Ё         юдддддд  culoarea de INK
+         Ё   Ё     Ё
+         Ё   Ё     юддддддддддддддддд culoarea de PAPER
+         Ё   Ё
+         Ё   юддддддддддддддддддддддд BRIGHT
+         Ё
+         юддддддддддддддддддддддддддд FLASH
+
+
+
+  La un momentdat pe ecran pot exista 16 culori : 8 culori prime si 8 culori
+"Light" (intense). Dintre aceste 16 culori doar 15 sunt vizibile (diferite)
+deoarece Black este identic cu LightBlack.
+  O culoare apare "Light' daca este setat bitul BRIGHT din cadrul octetului
+de atribute.
+
+  Hardware-ul calculatoarelor Spectrum combina informatia de BRIGHT si INK
+si obtine o anumita culoare Cul1, iar din informatia de BRIGHT si PAPER
+obtine o culoare Cul2. Cul1 si Cul2 reprezinta una din aceste 15 culori.
+
+  Cul1 specifica culoarea in care se vor desena bitii de 1 din prima zona.
+  Cul2 specifica culoarea in care se vor desena bitii de 0 din prima zona.
+
+  Spectrumul utilizeaza sistemul (G=Green,R=Red,B=Blue).
+
+  Tripletele (G, R, B) care reprezinta culorile de pe ecran sunt de forma
+urmatoare: (x,0,x) unde x este 216 daca bitul de Bright este 0 sau 252 daca
+bitul de Bright este 1. In coloana 2 din tabel sunt date tripletele G,R,B
+pentru primele 8 culori de pe Spectrum (cele fara BRIGHT). Celelalte 8 culori
+sunt asemanatoare cu primele dar au in loc de 216 pe 252. Se observa ca
+Black este identic cu LightBlack (de aceea sunt doar 15 culori diferite).
+  Coloana 3 a tabelului a fost alcatuita pe baza coloanei a 2-a (vezi tab.)
+Numerele de pe coloana a 3-a au fost scrise in baza 10 si trecute pe coloana
+a patra a tabelului.
+
+  Faptul ca nici o culoare nu este de forma (x,y,z) (de ex. (35,56,23) )
+simplifica implementarea sistemului video la Spectrum.
+  Practic in cadrul byte-ului de atribute daca:
+     b0 = 1  => trebuie generat semnal Blue daca "pixel aprins"
+     b1 = 1  => trebuie generat semnal Red daca "pixel aprins"
+     b2 = 1  => trebuie generat semnal Green daca "pixel aprins"
+     b3 = 1  => trebuie generat semnal Blue daca "pixel stins"
+     b4 = 1  => trebuie generat semnal Red daca "pixel stins"
+     b5 = 1  => trebuie generat semnal Green daca "pixel stins"
+     b6 = 1  => determina intensitatea semnalului (BRIGHT)
+     b7 = 1  => FLASH
+
+
+     имммммммммммммммяммммммммммммммммммямммммммммммммммяммммммммммммммм╩
+     ╨ Index culoare Ё Valorile (G,R,B) Ё Numere 0..15  Ё Valorile lui  ╨
+     ╨  pe Spectrum  Ё(216 fara Bright) Ё  (in baza 2)  Ё INK sau PAPER ╨
+     ╨               Ё(252 daca Bright) Ё (vezi col. 2) Ё (vezi col. 3) ╨
+     лмммммммммммммммьммммммммммммммммммьмммммммммммммммьммммммммммммммм╧
+     ╨  0  Black     Ё  0     0    0    Ё    0  0  0    Ё       0       ╨
+     гдддддддддддддддеддддддддддддддддддедддддддддддддддеддддддддддддддд╤
+     ╨  1  Blue      Ё  0     0   216   Ё    0  0  1    Ё       1       ╨
+     гдддддддддддддддеддддддддддддддддддедддддддддддддддеддддддддддддддд╤
+     ╨  2  Red       Ё  0    216   0    Ё    0  1  0    Ё       2       ╨
+     гдддддддддддддддеддддддддддддддддддедддддддддддддддеддддддддддддддд╤
+     ╨  3  Magenta   Ё  0    216  216   Ё    0  1  1    Ё       3       ╨
+     гдддддддддддддддеддддддддддддддддддедддддддддддддддеддддддддддддддд╤
+     ╨  4  Green     Ё  216   0    0    Ё    1  0  0    Ё       4       ╨
+     гдддддддддддддддеддддддддддддддддддедддддддддддддддеддддддддддддддд╤
+     ╨  5  Cyan      Ё  216   0   216   Ё    1  0  1    Ё       5       ╨
+     гдддддддддддддддеддддддддддддддддддедддддддддддддддеддддддддддддддд╤
+     ╨  6  Yellow    Ё  216  216   0    Ё    1  1  0    Ё       6       ╨
+     гдддддддддддддддеддддддддддддддддддедддддддддддддддеддддддддддддддд╤
+     ╨  7  White     Ё  216  216  216   Ё    1  1  1    Ё       7       ╨
+     хмммммммммммммммоммммммммммммммммммомммммммммммммммоммммммммммммммм╪
+
+     Obs: Numerele 216 si 252 au fost alese considerand ca R,G,B sunt in
+          intervalul [0..255]
+
+

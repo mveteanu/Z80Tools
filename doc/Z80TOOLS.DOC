@@ -1,0 +1,246 @@
+
+
+
+                                Z80 TOOLS 1.1
+
+                           Autor: Marian Veteanu
+                           Email: vma@electra.upit.ro
+                           (c) VMA software 1997,1998
+
+
+
+     'Z80 TOOLS' se constituie dintr-o colectie de programe utilitare ce
+ruleaza pe calculatoare compatibile IBM-PC si au ca scop dezvoltarea de
+programe pentru calculatoarele compatibile Spectrum.
+     In continuare sunt prezentate aceste utilitare:
+
+
+
+
+    ÚÄÄÄÄÄÄÄÄÄÄ¿
+    ³1. BMP2SCR³  Converteste un fisier .BMP ce contine o imagine alb-negru
+    ÀÄÄÄÄÄÄÄÄÄÄÙ  sau !!! COLOR !!! ce are marimea de 256x192 pixeli,
+intr-un fisier SCR. Fisierele SCR au lungimea de 6912 bytes si reprezinta
+zona de memorie video a calculatoarelor Spectrum.
+    Datorita unui algoritm performant, BMP2SCR poate converti si imagini
+color, aceasta facilitatea ne mai fiind intalnita la nici un program de acest
+tip. Pentru un exemplu de folosire incercati: < bmp2scr demo.bmp >
+    Aceste fisiere se pot genera cu emulatorul Z80 al lui Gerton Lunter
+apasand F10 si alegand Extra function -> Save screen.
+    Optional se pot crea si screen-uri comprimate daca se specifica in linia
+de comanda parametrul /Cxx, unde xx este metoda de compresie.
+
+    xx=0 (STORE COMPRESSION) este valoarea implicita daca parametrul /Cxx
+lipseste. Screen-ul nu se comprima, avand lungimea de 6912 bytes. Extensia
+fisierului creat este .SCR
+
+    xx=1 (SIMPLE RLE COMPRESSION) se produce comprimarea screen-ului pe baza
+urmatorului algoritm. Daca screen-ul original contine bytes de 0 atunci
+acestia se comprima. De exemplu daca se intalneste o secventa de 200 octeti
+liberi, acestia se vor inlocui cu numai 2 octeti: 0 si 200. Cu cat un ecran
+este mai liber cu atat se va comprima mai mult. Acesta nu este cel mai
+performant algoritm dar este cel mai simplu de programat si inteles in limbaj
+de asamblare. Extensia fisierului creat este .SC1 iar lungimea lui variaza de
+la 100-200 bytes pana la 6912 bytes.Iata in continuare programul in asamblare
+care se foloseste pentru decomprimarea screen-ului.
+
+
+          ORG  49400
+
+          LD   HL,16384  ; adresa unde se decomprima
+          LD   DE,50000  ; adresa unde se gaseste screen-ul comprimat
+    LIT   LD   A,(DE)
+          CP   0
+          JR   Z,ZERO
+          LD   (HL),A
+          INC  HL
+          INC  DE
+          JR   ANL
+    ZERO  INC  DE
+          LD   A,(DE)
+          LD   B,A
+    L1    LD   (HL),0
+          INC  HL
+          DJNZ L1
+          INC  DE
+    ANL   LD   A,91      ; 91*256-16384=6912
+          CP   H
+          JR   Z,LIT
+          RET
+
+    Aceasta subrutina se poate intoduce cu un asamblorul Gens (GENS3M21 este
+produs inregistrat al firmei HISOFT) sau cu un cross-asamblor.
+Cei care nu au asa ceva pot folosi urmatorul program BASIC:
+
+    10 LET adr=49400
+    20 FOR f=0 TO 30: READ a: POKE adr+f,a: NEXT f
+    30 DATA 33,0,64,17,80,195,26,254,0,40,5,119,35,19,24,9,19,26,71,54
+       0,35,16,251,19,62,91,188,32,232,201
+    40 RANDOMIZE USR adr
+
+    Obs: Bytes-ii 2 si 3 din linia 30 DATA ... specifica zona unde se
+decomprima screen-ul 64*256+0=16348, iar bytes-ii 5 si 6 specifica zona
+unde se afla screen-ul comprimat: 195*256+80=50000.
+
+
+
+    xx=2 (RLE COMPRESSION) Aceasta este o metoda mai performanta de compresie
+a screen-urilor ce se bazeaza pe algoritmul RLE (Run Length Encoding).
+
+Algoritmul este urmatorul:
+
+    - un grup de 1...256 de octeti cu valoarea #76 sunt substituiti cu
+alti 3 bytes:
+       1. #76 - marker pentru zona de expandare
+       2. #76 - octet de expandare
+       3. Y   - nr. octeti de expandare
+
+    - un grup de 4...256 de octeti identici diferiti de #76 sunt substituiti
+cu 3 octeti dupa cum urmeaza:
+       1. #76 - marker pentru zona de expandare
+       2. X   - octet de expandare
+       3. Y   - nr. octeti de expandare
+
+    S-a ales ca marker pentru zona de expandare octetul #76 deoarece acesta
+corespunde in limbaj de asamblare instructiunii HALT care este foarte putin
+folosita si astfel se pot realiza compresii mai bune.
+
+    Iata in continuare rezultatul aplicarii acestui algoritm pe screen-urile
+catorva jocuri:
+
+            JOC         Lungime initiala     Lungime finala
+        ----------------------------------------------------
+
+        LOADE RUNNER          6912                2327
+        BACK GAMMON           6912                3082
+        STRIDER               6912                2773
+        TURBO ESPRIT          6912                3552
+        KNIGHT LORE           6912                5049
+        MOON ALERT            6912                5409
+        MATCH DAY             6912                4527
+
+
+    Luand in considerare numai cele 7 exemple se observa ca spatiul ocupat de
+datele comprimate reprezinta numai 55.22 procente din spatiul initial.
+De remarcat extremele de lungime ale fisierelor comprimate folosind acest
+algoritm. Un screen gol (6912 bytes de 0) a fost comprimat in 81 de octeti,
+iar unul format din 6912 octeti alternativ de #76 si #03 s-a marit la
+13824 bytes!.
+    Pentru decomprimarea screen-ului se poate folosi programul:
+
+         ORG  45000
+
+         LD   HL,50000      ; adresa unde se gaseste screen-ul comprimat
+         LD   DE,16384      ; adresa unde se expandeaza
+         LD   BC,4337       ; marimea screen-ului comprimat
+DEM      LD   A,B
+         OR   C
+         RET  Z
+         LD   A,(HL)
+         INC  HL
+         DEC  BC
+         CP   118
+         JR   Z,EXP
+         LD   (DE),A
+         INC  DE
+         JR   DEM
+EXP      LD   A,(HL)
+         INC  HL
+         DEC  BC
+         PUSH BC
+         LD   B,(HL)
+         INC  HL
+EXP1     LD   (DE),A
+         INC  DE
+         DJNZ EXP1
+         POP  BC
+         DEC  BC
+         JR  DEM
+
+
+
+
+
+
+    ÚÄÄÄÄÄÄÄÄÄÄ¿
+    ³2. SCR2TAP³  Converteste un fisier .SCR intr-un fisier .TAP folosit de
+    ÀÄÄÄÄÄÄÄÄÄÄÙ  majoritatea emulatoarelor de Spectrum existente. Pentru
+observarea utilitatii programelor BMP2SCR si SCR2TAP analizati in emulator
+fisierul IMAGINI.TAP. Acesta contine un mic program BASIC care incarca la
+cerere de pe banda 7 screen-uri.
+    Aceste screen-uri au fost initial imagini BMP in 16M culori, apoi au fost
+prelucrate cu un program de grafica si au devenit imagini BMP 256x192xB&W.
+Cu ajutorul lui BMP2SCR s-au creat din aceste imagini 7 fisiere SCR, care
+apoi au fost convertite in fisiere TAP cu SCR2TAP.
+    S-a creat apoi programul BASIC care a fost salvat in fisierul IMAGINI.TAP
+si dupa aceia s-au unit si celelalte fisiere TAP ce contineau screen-urile la
+acest fisier printr-o comanda de genul:
+        COPY IMAGINI.TAP+SCR1.TAP+SCR2.TAP+SCR3.TAP IMAGINI.TAP /B
+
+
+
+
+
+
+    ÚÄÄÄÄÄÄÄ¿
+    ³3. DASM³  Z80 Cross Disassembler este un cross dezasamblor pentru
+    ÀÄÄÄÄÄÄÄÙ  microprocesorul Z80 ce tine seama de particularitatile
+calculatoarelor Spectrum. I se poate specifica sa produca listingul codului
+pe care il dezasambleaza sau sursa acestuia in scopul de a fi ulterior
+reasamlata. Output-ul poate fi afisat pe ecran sau redirectat intr-un
+fisier.
+     Exemple de utilizare:
+
+         1) dasm.exe test1.cod /D /A45000 /S > test1.as
+            Produce in fisierul test1.as sursa codului din fisierul test1.cod
+            Se genereaza numerele in zecimal ( /D )
+            Se considera adresa de inceput a codului ca fiind 45000 ( /A45000 )
+
+         2) dasm.exe test2.cod /A32768
+            Se afiseaza pe ecran listing-ul programului test2.cod
+
+
+
+
+
+    ÚÄÄÄÄÄÄÄÄÄÄ¿
+    ³4. BIN2TAP³ Converteste un fisier binar intr-un fisier TAP folosit de
+    ÀÄÄÄÄÄÄÄÄÄÄÙ majoriatatea emulatoarelor de Spectrum. Acest program se
+foloseste pentru introducerea pe Spectrum a fisierelor binare existente
+pe un PC. O intrbuintare utila o constituie folosirea acestui program
+impreuna cu cross-asamblorul shareware TASM. Acest asamblor poate produce
+cod binar rulabil pe Z80 care trebui convertit in fisier TAP cu BIN2TAP.
+
+
+
+
+    ÚÄÄÄÄÄÄÄÄÄÄ¿
+    ³5. SCRUTIL³ Acesta este un program pentru vizualizarea screen-urilor
+    ÀÄÄÄÄÄÄÄÄÄÄÙ de Spectrum sau conversia acestora in formate de fisiere
+grafice folosite pe PC-uri. Programul poate extrage screen-ul din urmatoarele
+tipuri de formate : .SCR, .SC1, .SC2, .SNA, .Z80, .SLT, .PRG, .SP, .SIT.
+Aceste formate sunt recunoscute de aproape toate emulatoarele de Spectrum-uri.
+Sunt recunoscute toate versiunile de fisiere .Z80 folosite de emulatorul
+Z80 v3.05 (al lui Gerton Lunter ). SCRUTIL poate efectua in acelasi timp si
+conversia screen-ului cat si vizualizarea sa.
+    Optiunea -b[n], daca este prezenta, specifica marimea BORDER-ului ce se
+va crea in jurul imaginii. Aceasta marime este data in caractere (1 car=
+8pixeli). Daca pe linia de comanda apare doar -b atunci se considera n=2.
+    Optiunea -f determina folosirea celei de-a doua stari a flash-ului.
+
+    Exemple:
+        SCRUTIL zynaps.z80 -v      = vizualizeaza screen-ul din zynaps.z80
+        SCRUTIL lemm.sna -v -t     = converteste in .TIF si vizualizeaza
+                                     screen-ul din lemm.sna
+        SCRUTIL imag.scr -w -f     = converteste imag.scr in imag.bmp
+
+
+    ÚÄÄÄÄÄÄÄÄÄÄ¿
+    ³6. READCHR³ Utilitar pentru vizualizarea si extragerea seturilor de
+    ÀÄÄÄÄÄÄÄÄÄÄÙ caractere definite de utilizator dintr-un dintr-un fis .SNA.
+    Exemple:
+        READCHR multiman.sna -v    = vizualizeaza setul de caractere
+        READCHR zynaps.sna -v -f   = vizualizeaza si salveaza setul de
+                                     caractere din zynaps.sna
+
+
