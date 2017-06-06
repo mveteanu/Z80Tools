@@ -13,7 +13,7 @@ Contains
 Source code can be found in [/src](/src) folder.
 To compile the Z80 Tools, use Borland Pascal.
 
-Z80 Tools contains one of the fewer converters of color images to Spectrum screens:
+Z80 Tools contains a unique color images to Spectrum screen converter:
 
 ![](doc/z80tools.png)
 
